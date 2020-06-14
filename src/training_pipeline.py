@@ -74,7 +74,7 @@ def train(model, train_loader, criterion, optimizer, text_transformer, blank_id,
         torch.save({'model': model.state_dict(),
                     'optimizer': optimizer.state_dict(),
                     'epoch': epoch + 1},
-                    f'exps/baseline_enrich/chkpt/chkpt_{epoch + 1}.pt')
+                    f'../exps/baseline_enrich/chkpt/chkpt_{epoch + 1}.pt')
 
     return train_loss
 
@@ -161,7 +161,7 @@ def main():
     cer_computer = CERmetrics(blank_id, text_transformer, enrich_target=enrich_target)
 
     # Tensorboard
-    writer = CustomWriter('exps/baseline_enrich/logs')
+    writer = CustomWriter('../exps/baseline_enrich/logs')
 
     # Logger
     logger = logging.getLogger()

@@ -12,7 +12,7 @@
 
 * Each signal is padded with zeros to the length of the longest audio (which is ~3.9s)
 
-* The NN architecture is a small copy of DeepSpeech with <PLACEHOLDER> N parameters. The idea is following:
+* The NN architecture is a small copy of DeepSpeech with 1.2M parameters. The idea is following:
 ```
     Audio -> MFCC -> CNN-feature-extractor -> RNN layers -> Greedy decoder -> CTC-loss
 ```

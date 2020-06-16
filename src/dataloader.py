@@ -136,4 +136,3 @@ if __name__ == "__main__":
 
     for x, y in train_loader:
         print(x, y)
-

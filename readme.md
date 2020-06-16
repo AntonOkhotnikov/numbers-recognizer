@@ -1,45 +1,52 @@
-## 
+## Numbers audio recognizer
 
+### Solution description
 
-### Description
-Architecture and so on goes here
+* No augmentations are applied, because I assume that test set contains similar clear TTS recordings (no speed/volume perturbations, no noises)
 
+* Since we have a word "тысяча" almost in the middle of each sentence (for every 4-digits number and bigger), I insert a "*" symbol in target labels as an additional token (at position -4) that emulates the word "тысяча" with a hope that this will improve the quality somehow. The parameter `enrich_target (bool)` controls if this token is used. Example: `4892 -> 4*892`
 
-* No augmentations are applied, because I assume that test set contains similar clear TTS recordings
+* Since we try to recognize numbers itself (not on a character level), I tried to use wide convolutional kernels
 
-* Since we have a word "тысяча" almost in the middle of each sentence, I would insert a "_" symbol as a token that emulates the word "тысяча". I hope this will improve the quality somehow
+* I use standard 13-dimensional MFCC as input features (with a frame size of 25 ms and shift if 10 ms)
 
-* Still requires log-mel-filterbanks (MFCC) features: CNN-based encoder with a following recurrent (LSTM) decoder.
+* Each signal is padded with zeros to the length of the longest audio (which is ~3.9s)
 
-* I assume to minimize the CTC-loss when passing the CNN-extracted features from signal
-
-* Probably need to combine Cross-Entropy loss for symbols classified. And then combine CE-loss with CTC-loss when passing all the features to recurrent decoder
+* The NN architecture is a small copy of DeepSpeech with <PLACEHOLDER> N parameters. The idea is following:
+```
+    Audio -> MFCC -> CNN-feature-extractor -> RNN layers -> Greedy decoder -> CTC-loss
+```
 
 
 ### TO-DO:
-* Dataloaders - returns [len, 13] array, where `len` varies depending on real length. Also returns `target` sequence
-* Loss combine
-* Tensorboard metrics callbacks
-* Fix net input? by padding maybe
-* Currently - random batch generation
-* Max audio len is 3.831500
-* Define big CNN kernel size and stride - because want to detect words, not symbols
-* Beam search decoder? - https://github.com/parlance/ctcdecode
+* Same gender batching
+* Beam search decoder - https://github.com/parlance/ctcdecode
 
 
 ### Build
-Please go to `build` and build docker image first
+Build section with a Docker image building will be updated later
 
 
 ### Training
 
+* Install requirements first
+```bash
+    python3 -m pip install -r requirements.txt
+```
+
+* Go to `src` folder and begin training with
+```
+    python3 training_pipeline.py [-h] -e <EXP_NAME> -d <DATA_ROOT> [-b <BATCH_SIZE>] [-n <NUM_EPOCHS>]
+```
+
+* See training logs with **Tensorboard**:
+```bash
+    tensorboard --logdir exps/<EXP_NAME>/logs --port 8008
+```
 
 ### Inference
-
-
-
-### Possible improvements
-* Since input size is fixed - try attention instead of BiLSTM?
+To be updated
 
 ### Resources
 * https://www.assemblyai.com/blog/end-to-end-speech-recognition-pytorch
+* https://github.com/SeanNaren/deepspeech.pytorch

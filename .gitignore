@@ -1,0 +1,13 @@
+# Python files
+*/__pycache__/
+*.py[cod]
+.Python
+.eggs/
+*.egg-info/
+*.egg
+*.manifest
+*.spec
+pip-log.txt
+.vscode
+exps/
+data/

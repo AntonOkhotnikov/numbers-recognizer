@@ -7,18 +7,18 @@ import argparse
 import torch
 from torch.optim import AdamW
 
-from model import NumbersRecognizer, DeepSpeechClone
-from dataloader import get_train_dev_loaders
-from data_utils import TextTransformer
 from metrics import CERmetrics
-from decoder import GreedyDecoder
 from writer import CustomWriter
+from model import DeepSpeechClone
+from decoder import GreedyDecoder
+from data_utils import TextTransformer
+from dataloader import get_train_dev_loaders
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
-def train(model, train_loader, criterion, optimizer, text_transformer, blank_id, writer, epoch, logger):
+def train(model, train_loader, criterion, optimizer, text_transformer, blank_id, writer, epoch, logger, exp_path):
     # monitor training loss
     train_loss = 0.0
 
@@ -26,7 +26,6 @@ def train(model, train_loader, criterion, optimizer, text_transformer, blank_id,
     model.train()
     
     for inputs, labels in train_loader:
-        # print(inputs.shape)
         # here goes one mini-batch processing
         inputs = inputs.to(device)
         # convet labels to integers and stack in Tensor (with padding)
@@ -70,11 +69,11 @@ def train(model, train_loader, criterion, optimizer, text_transformer, blank_id,
 
     # save checkpoint
     if (epoch + 1) % 10 == 0:
-        os.makedirs('exps/baseline_enrich/chkpt', exist_ok=True)
+        os.makedirs('/'.join([exp_path, 'chkpt']), exist_ok=True)
         torch.save({'model': model.state_dict(),
                     'optimizer': optimizer.state_dict(),
                     'epoch': epoch + 1},
-                    f'../exps/baseline_enrich/chkpt/chkpt_{epoch + 1}.pt')
+                    f'{exp_path}/chkpt/chkpt_{epoch + 1}.pt')
 
     return train_loss
 
@@ -96,7 +95,7 @@ def test(model, val_loader, criterion, text_transformer, blank_id, cer_computer,
             # pad long sequences with a blank symbol
             labels = torch.nn.utils.rnn.pad_sequence(labels, batch_first=True, padding_value=blank_id).to(device)
             # all inputs are padded to the same length, so next is valid
-            inputs_lens = [59] * inputs.shape[0]
+            inputs_lens = [19] * inputs.shape[0]
             labels_lens = [len(label) for label in labels]
 
             outputs = model(inputs)
@@ -119,19 +118,18 @@ def test(model, val_loader, criterion, text_transformer, blank_id, cer_computer,
     return test_loss, mean_cer
 
 
-def main():
+def main(exp_name, data_root_path, batch_size, n_epochs):
 
-    loader_params = {'batch_size': 1024,
+    exp_path = os.path.join(os.getcwd(), 'exps', exp_name)
+    os.makedirs(exp_path, exist_ok=True)
+
+    # 0. Get data loaders
+    loader_params = {'batch_size': batch_size,
                      'shuffle': False,
                      'num_workers': 1 if torch.cuda.is_available() else 6,
                      'pin_memory': False}
 
-    root_path='/home/anton/work/projects/myna/data/numbers'
-
-    train_loader, val_loader = get_train_dev_loaders(root_path, loader_params, train_ratio=0.9, max_len=3.9, enrich_target=True)
-
-    # 0. Training parameters
-    n_epochs = 15
+    train_loader, val_loader = get_train_dev_loaders(data_root_path, loader_params, train_ratio=0.9, max_len=3.9, enrich_target=True)
 
     # 1. NN hyperparams
     enrich_target = True  # this flag adds symbol '*' ~ 'тысяча' if a number is longer than 3 digits
@@ -143,7 +141,7 @@ def main():
                   'n_feats': 64, 
                   'stride': (2, 1),
                   'dropout': 0.1}
-    # model = NumbersRecognizer(num_classes)
+
     model = DeepSpeechClone(**net_params).to(device)
     print('Number of model params', sum([param.nelement() for param in model.parameters()]))
 
@@ -160,14 +158,14 @@ def main():
     # CER metrics in train/test
     cer_computer = CERmetrics(blank_id, text_transformer, enrich_target=enrich_target)
 
-    # Tensorboard
-    writer = CustomWriter('../exps/baseline_enrich/logs')
+    # Tensorboard writer
+    writer = CustomWriter('/'.join([exp_path, 'logs']))
 
     # Logger
     logger = logging.getLogger()
 
     for epoch in range(n_epochs):
-        train_loss = train(model, train_loader, criterion, optimizer, text_transformer, blank_id, writer, epoch, logger)
+        train_loss = train(model, train_loader, criterion, optimizer, text_transformer, blank_id, writer, epoch, logger, exp_path)
         print(f'Epoch: {epoch + 1}\nTraining Loss: {train_loss :.4f}')
 
         test_loss, test_cer = test(model, val_loader, criterion, text_transformer, blank_id, cer_computer, writer, epoch)
@@ -177,4 +175,13 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-e', '--exp-name', dest='exp_name', help='Experiment name', type=str, required=True)
+    parser.add_argument('-d', '--data-root', dest='data_root', help='Path to training data root folder `numbers`', type=str, required=True)
+    parser.add_argument('-b', '--batch-size', dest='batch_size', help='Batch size', type=int, required=False, default=512)
+    parser.add_argument('-n', '--n-epochs', dest='num_epochs', help='Number of training epochs', type=int, required=False, default=50)
+
+    args = parser.parse_args()
+
+    main(args.exp_name, args.data_root, args.batch_size, args.num_epochs)
